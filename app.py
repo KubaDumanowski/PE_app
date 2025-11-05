@@ -2,20 +2,13 @@ import numpy as np
 import streamlit as st
 import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="Soundscape: Przyjemność-Wydarzeniowość", layout="wide")
+st.set_page_config(page_title="Soundscape: Przyjemność–Wydarzeniowość", layout="wide")
 
-st.title("Ocena soundscape: Przyjemność-Wydarzeniowość")
+st.title("Ocena soundscape: Przyjemność–Wydarzeniowość")
 st.caption(
-    "Skala ocen 0–100. Wykres aktualizuje się na żywo. "
+    "Skala ocen ciągła (0–100) lub Likerta (1–5). Wykres aktualizuje się na żywo. "
     "Współrzędne liczone metodą ISO 12913-3:2025 z normalizacją (Mitchell, 2025)."
 )
-
-# --- KONFIGURACJA SKALI ---
-MIN_SCORE = 0
-MAX_SCORE = 100
-DEFAULT_SCORE = 50
-mu = (MIN_SCORE + MAX_SCORE) / 2.0
-rho = (MAX_SCORE - MIN_SCORE) / 2.0
 
 # --- ATRYBUTY I KĄTY ---
 ATTRS = [
@@ -34,7 +27,8 @@ angles_rad = np.deg2rad(angles_deg)
 cos_t = np.cos(angles_rad)
 sin_t = np.sin(angles_rad)
 
-def compute_pe(scores: np.ndarray):
+
+def compute_pe(scores: np.ndarray, mu, rho):
     centered = scores - mu
     p_raw = np.sum(cos_t * centered)
     e_raw = np.sum(sin_t * centered)
@@ -44,30 +38,61 @@ def compute_pe(scores: np.ndarray):
     e = e_raw / e_max if e_max > 0 else 0.0
     return float(np.clip(p, -1, 1)), float(np.clip(e, -1, 1))
 
+
+# --- PANEL USTAWIEŃ ---
+with st.expander("⚙️ Ustawienia (rozwiń, aby zmienić skalę oceny)"):
+    scale_mode = st.radio(
+        "Wybierz tryb oceny:",
+        ("Skala ciągła (0–100)", "Skala Likerta (1–5)"),
+        index=0,
+        horizontal=True,
+    )
+
+# Jeśli użytkownik zmieni tryb → reset + rerun, by przebudować widgety
+if "scale_mode" in st.session_state and st.session_state.scale_mode != scale_mode:
+    st.session_state.clear()
+    st.session_state.scale_mode = scale_mode
+    st.rerun()
+
+st.session_state.scale_mode = scale_mode
+
+if scale_mode == "Skala ciągła (0–100)":
+    MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0, 100, 50
+else:
+    MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 1, 5, 3
+
+mu = (MIN_SCORE + MAX_SCORE) / 2.0
+rho = (MAX_SCORE - MIN_SCORE) / 2.0
+
 # --- INICJALIZACJA ---
 if "scores" not in st.session_state:
     st.session_state.scores = [DEFAULT_SCORE] * len(ATTRS)
+
 for i in range(len(ATTRS)):
     if f"slider_{i}" not in st.session_state:
         st.session_state[f"slider_{i}"] = DEFAULT_SCORE
     if f"num_{i}" not in st.session_state:
         st.session_state[f"num_{i}"] = DEFAULT_SCORE
 
+
 # --- CALLBACKI ---
 def sync_from_slider(i):
-    value = int(st.session_state[f"slider_{i}"])
-    st.session_state[f"num_{i}"] = value
-    st.session_state.scores[i] = value
+    val = int(st.session_state[f"slider_{i}"])
+    st.session_state[f"num_{i}"] = val
+    st.session_state.scores[i] = val
+
 
 def sync_from_number(i):
-    value = int(st.session_state[f"num_{i}"])
-    st.session_state[f"slider_{i}"] = value
-    st.session_state.scores[i] = value
+    val = int(st.session_state[f"num_{i}"])
+    st.session_state[f"slider_{i}"] = val
+    st.session_state.scores[i] = val
+
 
 def reset_one(i):
     st.session_state[f"slider_{i}"] = DEFAULT_SCORE
     st.session_state[f"num_{i}"] = DEFAULT_SCORE
     st.session_state.scores[i] = DEFAULT_SCORE
+
 
 def reset_all():
     for i in range(len(ATTRS)):
@@ -75,12 +100,13 @@ def reset_all():
         st.session_state[f"num_{i}"] = DEFAULT_SCORE
     st.session_state.scores = [DEFAULT_SCORE] * len(ATTRS)
 
+
 # --- LAYOUT ---
 left, right = st.columns([0.45, 0.55])
 
 with left:
-    st.subheader("Oceny atrybutów (0–100)")
-    st.button("🔄 Resetuj wszystkie suwaki do 50", on_click=reset_all)
+    st.subheader(f"Oceny atrybutów ({MIN_SCORE}–{MAX_SCORE})")
+    st.button("🔄 Resetuj wszystkie suwaki do wartości domyślnych", on_click=reset_all)
 
     for i, (name, _) in enumerate(ATTRS):
         cols = st.columns([0.6, 0.25, 0.15])
@@ -111,14 +137,14 @@ with left:
                 args=(i,),
             )
         with cols[2]:
-            st.button("↺", key=f"reset_{i}", help="Resetuj do 50", on_click=reset_one, args=(i,))
+            st.button("↺", key=f"reset_{i}", help="Resetuj do wartości domyślnej", on_click=reset_one, args=(i,))
 
     scores = np.array(st.session_state.scores, dtype=float)
-    P, E = compute_pe(scores)
-    st.markdown(f"**Przyjemność (P):** {P:+.3f}   **Wydarzeniowość (E):** {E:+.3f}")
+    P, E = compute_pe(scores, mu, rho)
+    st.markdown(f"**Przyjemność (P):** {P:+.3f}  **Wydarzeniowość (E):** {E:+.3f}")
 
 with right:
-    st.subheader("Przyjemność-Wydarzeniowość")
+    st.subheader("Model Przyjemność–Wydarzeniowość")
     fig, ax = plt.subplots(figsize=(3, 3))
     ax.set_xlim(-1, 1)
     ax.set_ylim(-1, 1)
@@ -126,10 +152,10 @@ with right:
     ax.set_ylabel("Wydarzeniowość (E)")
     ax.set_aspect("equal", adjustable="box")
     ax.grid(True, linestyle="--", alpha=0.5)
-    ax.axhline(0, linewidth=1, color = "black")
-    ax.axvline(0, linewidth=1, color = "black")
-    #circle = plt.Circle((0, 0), 1, fill=False, linestyle=":", linewidth=1)
-    #ax.add_artist(circle)
-    ax.scatter([P], [E], s=50, color = "blue")
+    ax.axhline(0, linewidth=1, color="black")
+    ax.axvline(0, linewidth=1, color="black")
+    ax.scatter([P], [E], s=50, color="blue")
     ax.text(P, E, f" ({P:+.2f}, {E:+.2f})", va="center", fontsize=6)
     st.pyplot(fig, use_container_width=False)
+
+st.caption(f"**Aktualny tryb:** {scale_mode}  μ = {mu:.1f}, ρ = {rho:.1f}")
