@@ -133,20 +133,3 @@ with right:
     ax.scatter([P], [E], s=50, color = "blue")
     ax.text(P, E, f" ({P:+.2f}, {E:+.2f})", va="center", fontsize=6)
     st.pyplot(fig, use_container_width=False)
-
-# --- REFERENCJA ---
-with st.expander("Pokaż pozycje atrybutów na modelu kołowym (referencja kierunków)"):
-    fig2, ax2 = plt.subplots(figsize=(3, 3))
-    ax2.set_xlim(-1, 1)
-    ax2.set_ylim(-1, 1)
-    ax2.set_aspect("equal", adjustable="box")
-    ax2.grid(True, linestyle="--", alpha=0.5)
-    ax2.axhline(0, linewidth=1)
-    ax2.axvline(0, linewidth=1)
-    circle2 = plt.Circle((0, 0), 1, fill=False, linestyle=":", linewidth=1)
-    ax2.add_artist(circle2)
-    for (name, deg), c, s in zip(ATTRS, cos_t, sin_t):
-        ax2.arrow(0, 0, c * 0.9, s * 0.9, head_width=0.02, length_includes_head=True)
-        ax2.text(c * 0.95, s * 0.95, name, ha="center", va="center", fontsize=4)
-    ax2.set_title("Kierunki atrybutów", fontsize=9)
-    st.pyplot(fig2, use_container_width=False)
